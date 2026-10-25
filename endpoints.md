@@ -13,10 +13,10 @@ Provide exactly one nonempty `query` parameter: a standard RFC 4648 Base64-encod
 Supported syntax:
 
 - Decimal numbers such as `12`, `-3`, and `0.5`; a decimal point requires digits on both sides (`.5` and `5.` are invalid).
-- Binary `+`, `-`, `*`, `/`, unary `+` and `-`, and parentheses.
-- Precedence: parentheses, unary signs, multiplication/division, addition/subtraction. Binary operators of equal precedence associate left to right.
+- Binary `+`, `-`, `*`, `/`, `^`, postfix `%`, unary `+` and `-`, and parentheses. Roots use fractional exponents: `9^(1/2)` returns `3`; `50%` means `50/100`.
+- Precedence: parentheses, postfix percentage, exponentiation, unary signs, multiplication/division, addition/subtraction. Powers associate right to left (`2^3^2 = 512`); other binary operators associate left to right. Thus `-2^2 = -4` and `2^-2 = 0.25`. Repeated `%` divides by 100 each time.
 
-All other syntax is invalid, including scientific notation, implicit multiplication, variables, functions, `%`, and exponentiation (`^` or `**`). Expressions are parsed directly without `eval`.
+All other syntax is invalid, including scientific notation, implicit multiplication, variables, functions, and `**`. Expressions are parsed directly without `eval`.
 
 ## Responses
 
@@ -26,7 +26,7 @@ Success: HTTP `200`, `Content-Type: application/json`:
 {"result":"1.2345"}
 ```
 
-The result is a decimal **string**. Arithmetic is exact until final formatting:
+The result is a decimal **string**. Basic arithmetic, percentages, and integer powers are exact until final formatting. Rational square roots are exact when possible; other square roots use 256-bit precision. Other fractional powers use floating-point approximation, so large or rounding-boundary results may lose precision. Formatting:
 
 - Round to at most **4 decimal places**, with halves rounded away from zero.
 - Allow at most **33 integer digits after rounding**, excluding the minus sign.
@@ -43,7 +43,7 @@ Calculation and validation errors use a JSON object:
 | --- | --- |
 | `400` | Missing/repeated/empty `query`, invalid Base64 or UTF-8, input over 64 characters, or invalid expression |
 | `405` | Unsupported method; `Allow: GET` |
-| `422` | Division by zero or a rounded result exceeding 33 integer digits |
+| `422` | Division by zero, undefined value (including invalid real powers), computation limit, or a rounded result exceeding 33 integer digits |
 | `500` | Unexpected server failure |
 
 ## Examples
@@ -55,4 +55,4 @@ Calculation and validation errors use a JSON object:
 | `1/3` | `/math?query=MS8z` | `200` `{"result":"0.3333"}` |
 | `1/0` | `/math?query=MS8w` | `422` `{"error":"Division by zero"}` |
 
-The decimal literals for `10^25` and `10^32` return unchanged; the notation `10^32` itself is unsupported.
+Both decimal literals and exponentiation such as `10^32` are supported. Integer exponents have magnitude at most 10,000, with a 65,536-bit estimated allocation budget per power. Negative bases require integer exponents; `0^0` and `0/0` return `422` with `{"error":"Undefined value"}`, and zero to a negative power is division by zero. Non-finite or underflowed fractional powers return `422`.

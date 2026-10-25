@@ -1,4 +1,4 @@
-package math
+package httpapi
 
 import (
 	"encoding/base64"
@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gaudiot/sezzle-challenge/calculator"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -15,68 +16,73 @@ const maxResultIntegerDigits = 33
 
 var errResultTooLarge = errors.New("Result cannot exceed 33 integer digits")
 
-type handleMathReturn struct {
+type calculatorResponse struct {
 	Result string `json:"result"`
 }
 
-type mathRouter struct{}
+type CalculatorHandler struct{}
 
-func NewMathRouter() *mathRouter {
-	return &mathRouter{}
+func NewCalculatorHandler() *CalculatorHandler {
+	return &CalculatorHandler{}
 }
 
-func (mr *mathRouter) Router(r chi.Router) {
-	r.Get("/", mr.handleMath)
+func (handler *CalculatorHandler) Router(r chi.Router) {
+	r.HandleFunc("/", handler.handleCalculate)
 }
 
-func (mr *mathRouter) handleMath(w http.ResponseWriter, r *http.Request) {
+func (handler *CalculatorHandler) handleCalculate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		writeError(w, "Only GET is supported", http.StatusMethodNotAllowed)
+		return
+	}
 	queryParams := r.URL.Query()
 	encodedQueries := queryParams["query"]
 	if len(encodedQueries) != 1 {
-		writeMathError(w, "Exactly one 'query' parameter is required", http.StatusBadRequest)
+		writeError(w, "Exactly one 'query' parameter is required", http.StatusBadRequest)
 		return
 	}
 	encodedQuery := encodedQueries[0]
 
 	if encodedQuery == "" {
-		writeMathError(w, "Missing required 'query' parameter", http.StatusBadRequest)
+		writeError(w, "Missing required 'query' parameter", http.StatusBadRequest)
 		return
 	}
 
 	decodedQuery, err := base64.StdEncoding.DecodeString(encodedQuery)
 	if err != nil {
-		writeMathError(w, "Invalid Base64 query", http.StatusBadRequest)
+		writeError(w, "Invalid Base64 query", http.StatusBadRequest)
 		return
 	}
 
 	query := string(decodedQuery)
 
-	if len(query) > MaxExpressionLength {
-		writeMathError(w, "Query parameter cannot be larger than 64 characters", http.StatusBadRequest)
+	if len(query) > calculator.MaxExpressionLength {
+		writeError(w, "Query parameter cannot be larger than 64 characters", http.StatusBadRequest)
 		return
 	}
 
-	mathService := NewMathService()
+	engine := calculator.New()
 
-	result, err := mathService.Evaluate(query)
+	result, err := engine.Evaluate(query)
 	if err != nil {
 		status := http.StatusBadRequest
-		if errors.Is(err, ErrDivideByZero) {
+		if errors.Is(err, calculator.ErrUndefinedValue) || errors.Is(err, calculator.ErrDivideByZero) || errors.Is(err, calculator.ErrCalculationLimit) {
 			status = http.StatusUnprocessableEntity
 		}
-		writeMathError(w, err.Error(), status)
+		writeError(w, err.Error(), status)
 		return
 	}
 
 	formatted, err := formatResult(result)
 	if err != nil {
-		writeMathError(w, err.Error(), http.StatusUnprocessableEntity)
+		writeError(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(&handleMathReturn{
+	json.NewEncoder(w).Encode(&calculatorResponse{
 		Result: formatted,
 	})
 }
@@ -97,7 +103,7 @@ func formatResult(result *big.Rat) (string, error) {
 	return formatted, nil
 }
 
-func writeMathError(w http.ResponseWriter, message string, status int) {
+func writeError(w http.ResponseWriter, message string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})

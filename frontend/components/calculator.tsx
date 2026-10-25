@@ -3,12 +3,14 @@
 import { useRef, useState } from "react";
 import type { ChangeEvent, ClipboardEvent, FormEvent, KeyboardEvent } from "react";
 import { evaluateExpression } from "@/lib/calculator-api";
+import { appendToExpression } from "@/lib/expression-editing";
 import { getExpressionState, MAX_EXPRESSION_LENGTH } from "@/lib/expression-validation";
 import { CalculatorKeypad } from "./calculator-keypad";
 import { HistoryPanel } from "./history-panel";
 import type { HistoryEntry } from "./history-panel";
+import styles from "./calculator.module.css";
 
-const INVALID_CHARACTERS = /[^0-9+\-*/().]/;
+const INVALID_CHARACTERS = /[^0-9+\-*/^%().]/;
 
 export function Calculator() {
   const [expression, setExpression] = useState("");
@@ -31,8 +33,12 @@ export function Calculator() {
   };
 
   const append = (value: string) => {
-    const prefix = isShowingResult && !/^[+\-*/]$/.test(value) ? "" : expression;
-    updateExpression(`${prefix}${value}`);
+    if ((value === "^" || value === "root") && getExpressionState(expression) !== "complete") {
+      setError("Complete the expression before adding an exponent.");
+      inputRef.current?.focus();
+      return;
+    }
+    updateExpression(appendToExpression(expression, value, isShowingResult));
     inputRef.current?.focus();
   };
 
@@ -98,6 +104,11 @@ export function Calculator() {
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "^" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      append("^");
+      return;
+    }
     if (event.key === "Enter") {
       event.preventDefault();
       void evaluate();
@@ -129,9 +140,9 @@ export function Calculator() {
   };
 
   return (
-    <section className="calculator-workspace" aria-label="Calculator">
-      <form className="calculator-panel" onSubmit={handleSubmit}>
-        <div className="display">
+    <section className={styles["calculator-workspace"]} aria-label="Calculator">
+      <form className={styles["calculator-panel"]} onSubmit={handleSubmit}>
+        <div className={styles.display}>
           <label htmlFor="expression">{isShowingResult ? "Result" : "Expression"}</label>
           <input
             ref={inputRef}
@@ -154,13 +165,13 @@ export function Calculator() {
           <span className="sr-only" role="status">
             {isShowingResult ? `Result: ${expression}` : ""}
           </span>
-          <div className="result-row">
+          <div className={styles["result-row"]}>
             <span id="expression-hint">
               {isShowingResult ? "Use an operator to continue calculating." : `${expression.length}/${MAX_EXPRESSION_LENGTH}`}
             </span>
-            {isLoading && <span className="loading-dots" role="status" aria-label="Calculating">•••</span>}
+            {isLoading && <span className={styles["loading-dots"]} role="status" aria-label="Calculating">•••</span>}
           </div>
-          <div className="error-slot">
+          <div className={styles["error-slot"]}>
             {error && (
               <p id="calculator-error" role="alert">
                 {error}
@@ -176,6 +187,7 @@ export function Calculator() {
           onClear={clear}
           onEvaluate={() => void evaluate()}
         />
+        <p className={styles["operation-hint"]}>Power and square root apply to the whole expression. Square root adds ^(1/2). % divides by 100.</p>
       </form>
 
       <HistoryPanel

@@ -1,41 +1,6 @@
-package math
+package calculator
 
-import (
-	"errors"
-	"math/big"
-)
-
-// MaxExpressionLength bounds parsing depth and exact-arithmetic work.
-const MaxExpressionLength = 64
-
-var (
-	ErrDivideByZero      = errors.New("Division by zero")
-	ErrInvalidExpression = errors.New("Invalid expression")
-)
-
-type mathService struct{}
-
-func NewMathService() *mathService {
-	return &mathService{}
-}
-
-func (ms *mathService) Evaluate(expression string) (*big.Rat, error) {
-	if len(expression) == 0 || len(expression) > MaxExpressionLength {
-		return nil, ErrInvalidExpression
-	}
-	parser := expressionParser{expression: expression}
-
-	result, err := parser.evaluateExpression()
-	if err != nil {
-		return nil, err
-	}
-
-	if parser.position != len(parser.expression) {
-		return nil, ErrInvalidExpression
-	}
-
-	return result, nil
-}
+import "math/big"
 
 type expressionParser struct {
 	expression string
@@ -86,6 +51,9 @@ func (parser *expressionParser) evaluateTerm() (*big.Rat, error) {
 			return nil, err
 		}
 		if operator == '/' && right.Sign() == 0 {
+			if result.Sign() == 0 {
+				return nil, ErrUndefinedValue
+			}
 			return nil, ErrDivideByZero
 		}
 
@@ -109,7 +77,26 @@ func (parser *expressionParser) evaluateUnary() (*big.Rat, error) {
 		return value.Neg(value), nil
 	}
 
-	return parser.evaluateValue()
+	return parser.evaluatePower()
+}
+
+// Powers associate right to left and bind more tightly than unary signs.
+func (parser *expressionParser) evaluatePower() (*big.Rat, error) {
+	base, err := parser.evaluateValue()
+	if err != nil {
+		return nil, err
+	}
+	for parser.consume('%') {
+		base.Quo(base, big.NewRat(100, 1))
+	}
+	if !parser.consume('^') {
+		return base, nil
+	}
+	exponent, err := parser.evaluateUnary()
+	if err != nil {
+		return nil, err
+	}
+	return power(base, exponent)
 }
 
 func (parser *expressionParser) evaluateValue() (*big.Rat, error) {

@@ -1,21 +1,22 @@
 import { Calculator } from "@/components/calculator";
+import styles from "./page.module.css";
 
 export default function Home() {
   return (
-    <main className="page-shell">
-      <header className="page-header">
-        <div className="brand-mark" aria-hidden="true">
+    <main className={styles["page-shell"]}>
+      <header className={styles["page-header"]}>
+        <div className={styles["brand-mark"]} aria-hidden="true">
           =
         </div>
         <div>
-          <p className="eyebrow">A small arithmetic workspace</p>
-          <h1>Figure it out.</h1>
+          <p className={styles.eyebrow}>A small arithmetic workspace</p>
+          <h1 className={styles.heading}>Figure it out.</h1>
         </div>
       </header>
 
       <Calculator />
 
-      <footer className="page-footer">
+      <footer className={styles["page-footer"]}>
         <span>Four operations. No distractions.</span>
         <span>Keyboard ready</span>
       </footer>

@@ -1,3 +1,5 @@
+import styles from "./calculator-keypad.module.css";
+
 type CalculatorKeypadProps = {
   disabled: boolean;
   onAppend: (value: string) => void;
@@ -14,9 +16,13 @@ type CalculatorKey = {
 };
 
 const keys: CalculatorKey[] = [
+  { label: "xʸ", value: "^", kind: "operator", ariaLabel: "Exponentiation" },
+  { label: "√", value: "root", kind: "operator", ariaLabel: "Square root" },
+  { label: "%", value: "%", kind: "operator", ariaLabel: "Percentage" },
   { label: "Clear", value: "clear", kind: "utility", ariaLabel: "Clear expression" },
   { label: "(", value: "(" },
   { label: ")", value: ")" },
+  { label: "⌫", value: "backspace", ariaLabel: "Delete last character" },
   { label: "÷", value: "/", kind: "operator", ariaLabel: "Divide" },
   { label: "7", value: "7" },
   { label: "8", value: "8" },
@@ -32,7 +38,6 @@ const keys: CalculatorKey[] = [
   { label: "+", value: "+", kind: "operator", ariaLabel: "Add" },
   { label: "0", value: "0", kind: "wide" },
   { label: ".", value: "." },
-  { label: "⌫", value: "backspace", ariaLabel: "Delete last character" },
   { label: "=", value: "evaluate", kind: "equals", ariaLabel: "Calculate result" },
 ];
 
@@ -51,10 +56,10 @@ export function CalculatorKeypad({
   };
 
   return (
-    <div className="keypad" aria-label="Calculator keypad">
+    <div className={styles.keypad} aria-label="Calculator keypad">
       {keys.map((key) => (
         <button
-          className={`key key--${key.kind ?? "number"}`}
+          className={`${styles.key} ${key.kind ? styles[`key--${key.kind}`] : ""}`}
           disabled={disabled}
           key={key.value}
           type="button"

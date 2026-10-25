@@ -1,0 +1,123 @@
+.calculator-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.calculator-panel {
+  min-width: 0;
+  border: 1px solid rgba(23, 33, 31, 0.1);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  padding: 10px;
+}
+
+.display {
+  min-height: 188px;
+  padding: 22px 20px 13px;
+  border-radius: 17px;
+  background: var(--display);
+  color: white;
+}
+
+.display label {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--display-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.display input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f7f4ec;
+  font: 500 clamp(2rem, 9vw, 3.55rem)/1.2 var(--font-mono), monospace;
+  letter-spacing: -0.04em;
+  text-align: right;
+}
+
+.display input::placeholder {
+  color: #7b8b86;
+}
+
+.display input:focus-visible {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 8px;
+}
+
+.result-row {
+  display: flex;
+  min-height: 59px;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.result-row > span {
+  padding-bottom: 5px;
+  color: var(--display-muted);
+  font: 400 0.65rem/1 var(--font-mono), monospace;
+}
+
+.loading-dots {
+  display: inline-block;
+  animation: pulse 0.9s ease-in-out infinite alternate;
+  letter-spacing: 0.08em;
+}
+
+.error-slot {
+  min-height: 22px;
+  padding-top: 6px;
+}
+
+.error-slot p {
+  margin: 0;
+  color: #ff9a84;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.operation-hint {
+  margin: 12px 8px 4px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+@keyframes pulse {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+
+@media (min-width: 720px) {
+  .calculator-workspace {
+    height: 740px;
+    grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.9fr);
+  }
+
+  .calculator-panel {
+    height: 100%;
+    padding: 14px;
+  }
+
+  .display {
+    min-height: 212px;
+    padding: 26px 26px 16px;
+  }
+}
+
+@media (min-width: 980px) {
+  .calculator-workspace {
+    grid-template-columns: minmax(0, 2fr) minmax(300px, 0.82fr);
+  }
+}

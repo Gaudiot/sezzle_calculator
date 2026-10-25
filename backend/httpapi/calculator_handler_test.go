@@ -1,4 +1,4 @@
-package math
+package httpapi
 
 import (
 	"encoding/base64"
@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gaudiot/sezzle-challenge/calculator"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -28,7 +29,7 @@ func TestMathResponseFormatting(t *testing.T) {
 		{"-0", "0"},
 		{"100", "100"},
 		{"0.0001", "0.0001"},
-		{strings.Repeat("0", MaxExpressionLength), "0"},
+		{strings.Repeat("0", calculator.MaxExpressionLength), "0"},
 		{"1.23445", "1.2345"},
 		{"-1.23445", "-1.2345"},
 		{"0.00005", "0.0001"},
@@ -51,7 +52,7 @@ func TestMathResponseFormatting(t *testing.T) {
 			if got := response.Header().Get("Content-Type"); got != "application/json" {
 				t.Errorf("Content-Type = %q", got)
 			}
-			var body handleMathReturn
+			var body calculatorResponse
 			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 				t.Fatal(err)
 			}
@@ -71,7 +72,7 @@ func TestMathPowersOfTenReturnUnchanged(t *testing.T) {
 			if response.Code != http.StatusOK {
 				t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
 			}
-			var body handleMathReturn
+			var body calculatorResponse
 			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 				t.Fatal(err)
 			}
@@ -92,7 +93,7 @@ func TestMathErrors(t *testing.T) {
 		{"output too large", "1" + strings.Repeat("0", maxResultIntegerDigits), http.StatusUnprocessableEntity},
 		{"rounding over output limit", strings.Repeat("9", maxResultIntegerDigits) + ".99995", http.StatusUnprocessableEntity},
 		{"negative rounding over output limit", "-" + strings.Repeat("9", maxResultIntegerDigits) + ".99995", http.StatusUnprocessableEntity},
-		{"input too long", strings.Repeat("0", MaxExpressionLength+1), http.StatusBadRequest},
+		{"input too long", strings.Repeat("0", calculator.MaxExpressionLength+1), http.StatusBadRequest},
 		{"invalid expression", "1+", http.StatusBadRequest},
 		{"power syntax", "10**32", http.StatusBadRequest},
 	}
@@ -119,7 +120,7 @@ func TestMathRejectsWhitespace(t *testing.T) {
 	expressions := []string{" 1+2", "1+2 ", "1 +2", "1\t+2", "1\n+2", "1\r+2", "1\v+2", "1\f+2", "1\u00a0+2", "1\u2003+2", "\t", "1 2"}
 	for _, expression := range expressions {
 		t.Run(expression, func(t *testing.T) {
-			if _, err := NewMathService().Evaluate(expression); err != ErrInvalidExpression {
+			if _, err := calculator.New().Evaluate(expression); err != calculator.ErrInvalidExpression {
 				t.Errorf("Evaluate error = %v", err)
 			}
 			response := mathRequest(expression)
@@ -134,7 +135,7 @@ func TestMathRejectsInvalidQueryParameters(t *testing.T) {
 	for _, query := range []string{"", "query=", "query=!!!", "query=MQ%3D%3D&query=Mg%3D%3D", "query=%2Fw%3D%3D"} {
 		t.Run(query, func(t *testing.T) {
 			router := chi.NewRouter()
-			router.Route("/math", NewMathRouter().Router)
+			router.Route("/math", NewCalculatorHandler().Router)
 			response := httptest.NewRecorder()
 			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/math?"+query, nil))
 			if response.Code != http.StatusBadRequest {
@@ -150,10 +151,77 @@ func TestMathRejectsInvalidQueryParameters(t *testing.T) {
 
 func mathRequest(expression string) *httptest.ResponseRecorder {
 	router := chi.NewRouter()
-	router.Route("/math", NewMathRouter().Router)
+	router.Route("/math", NewCalculatorHandler().Router)
 	query := url.Values{"query": {base64.StdEncoding.EncodeToString([]byte(expression))}}
 	request := httptest.NewRequest(http.MethodGet, "/math?"+query.Encode(), nil)
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	return response
+}
+
+func TestAdvancedHTTPResults(t *testing.T) {
+	for expression, want := range map[string]string{
+		"0^-2": "0", "0^0.5": "0", "0^(-1/2)": "0", "0^3": "0", "2^3^2": "512", "9^(1/2)": "3", "2^(1/2)": "1.4142", "8^(1/3)": "2",
+		"(20+30)%": "0.5", "200*10%": "20", "10^32": "100000000000000000000000000000000",
+	} {
+		t.Run(expression, func(t *testing.T) {
+			response := mathRequest(expression)
+			var body calculatorResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if response.Code != http.StatusOK || body.Result != want {
+				t.Fatalf("status %d, body %s; want %s", response.Code, response.Body.String(), want)
+			}
+		})
+	}
+	for _, expression := range []string{"2^10001", "9^9^9", "10^33"} {
+		if response := mathRequest(expression); response.Code != http.StatusUnprocessableEntity {
+			t.Errorf("%s: status %d, body %s", expression, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestUnsupportedMethod(t *testing.T) {
+	router := chi.NewRouter()
+	router.Route("/math", NewCalculatorHandler().Router)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/math", nil))
+	var body map[string]string
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusMethodNotAllowed || response.Header().Get("Allow") != "GET" || body["error"] == "" {
+		t.Fatalf("unexpected response: %v %s", response, response.Body.String())
+	}
+}
+
+func TestUndefinedValues(t *testing.T) {
+	for _, expression := range []string{"0^0", "0/0", "(1-1)^(2-2)", "(1-1)/(2-2)"} {
+		t.Run(expression, func(t *testing.T) {
+			response := mathRequest(expression)
+			var body map[string]string
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if response.Code != http.StatusUnprocessableEntity || body["error"] != calculator.ErrUndefinedValue.Error() {
+				t.Fatalf("status %d, body %s", response.Code, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestNegativeRootsAreInvalidExpressions(t *testing.T) {
+	for _, expression := range []string{"(-4)^(1/2)", "(-9)^0.5", "(-8)^(1/3)", "(-4)^(-1/2)"} {
+		t.Run(expression, func(t *testing.T) {
+			response := mathRequest(expression)
+			var body map[string]string
+			if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+				t.Fatal(err)
+			}
+			if response.Code != http.StatusBadRequest || body["error"] != calculator.ErrInvalidExpression.Error() {
+				t.Fatalf("status %d, body %s", response.Code, response.Body.String())
+			}
+		})
+	}
 }

@@ -2,7 +2,7 @@
 
 A full-stack calculator built for the [challenge](challenge.md), with a React/TypeScript frontend using Next.js and a Go REST API using Chi.
 
-Supports addition, subtraction, multiplication, division, unary signs, and parentheses. The responsive interface accepts keyboard or keypad input, keeps a session history, and lets you continue calculating from a result. Whitespace is rejected in both layers.
+Supports addition, subtraction, multiplication, division, exponentiation (`^`), fractional roots, percentage (`%`), unary signs, and parentheses. The responsive interface accepts keyboard or keypad input, keeps a session history, and lets you continue calculating from a result. Whitespace is rejected in both layers.
 
 ## Setup and local development
 
@@ -94,14 +94,14 @@ See [endpoints.md](endpoints.md) for the complete syntax, result limits, and res
 
 ## Design decisions and assumptions
 
-- **Exact arithmetic:** the Go service parses decimal tokens into standard-library `math/big.Rat` values. Intermediate calculations remain exact, avoiding floating-point errors for large integers and decimal cancellation. Only the final result is rounded, to at most four decimal places, with halves rounded away from zero. Trailing zeros and negative zero are normalized.
+- **Exact arithmetic:** the Go service parses decimal tokens into standard-library `math/big.Rat` values. Basic arithmetic, percentages, and integer powers remain exact, avoiding floating-point errors for large integers and decimal cancellation. Square roots use exact rational results when possible, otherwise 256-bit precision. Other fractional powers use floating-point approximation and can lose precision for large results or near rounding boundaries. The final result is rounded, to at most four decimal places, with halves rounded away from zero. Trailing zeros and negative zero are normalized.
 - **64-character input limit:** this is a deliberate UX choice for a toy project focused on simple calculations. It leaves enough room for everyday expressions and for continuing from a large result, while keeping entry, editing, and the display manageable. It also bounds parsing and calculation work.
-- **33-digit integer output limit:** the original motivation was to define a supported numeric range while pursuing precise results and avoiding floating-point errors. The limit applies after rounding and excludes the sign and fractional digits; it includes decimal literals for both `10^25` and `10^32`. Precision comes from exact rational arithmetic, rather than from the digit cap itself: `float64` cannot guarantee 33-digit precision. The cap keeps the supported output range explicit. Exponentiation syntax itself is unsupported.
-- **Explicit parsing:** a recursive-descent parser implements arithmetic precedence directly, without `eval`. The HTTP router handles Base64 decoding, validation responses, and result formatting; arithmetic stays in the service.
+- **33-digit integer output limit:** the original motivation was to define a supported numeric range while pursuing precise results and avoiding floating-point errors. The limit applies after rounding and excludes the sign and fractional digits; it includes decimal literals for both `10^25` and `10^32`. Precision comes from exact rational arithmetic, rather than from the digit cap itself: `float64` cannot guarantee 33-digit precision. The cap keeps the supported output range explicit. Integer powers have bounded computation cost; see the API contract for limits.
+- **Explicit parsing:** a recursive-descent parser implements arithmetic precedence directly, without `eval`. The `httpapi` handler handles Base64 decoding, validation responses, and result formatting; parsing and arithmetic stay in the independent `calculator` package.
 - **Frontend expression validation:** typing, keypad entry, and paste are checked for valid expression structure. Leading `+`, consecutive operators, repeated decimal points within a number, unmatched closing parentheses, and implicit multiplication are rejected. Negative numbers are allowed at the start or after `(`; write `1*(-2)` rather than `1*-2`. Unfinished prefixes such as `1+`, `1.`, and `(` remain editable, but cannot be submitted until complete. The backend remains responsible for arithmetic errors such as division by zero.
 - **Same-origin requests:** the Next.js proxy lets the browser reach the Go service without requiring cross-origin access. The backend URL is configured on the Next.js server.
 - **Session-only history:** history lives in React state and resets on refresh. New entries appear at the bottom. An operator continues from the displayed result; a new digit starts a fresh expression. Continuing uses the displayed, rounded result.
-- **Scope:** the API supports the four required operations. Scientific notation, implicit multiplication, exponentiation, square roots, and percentage syntax are not implemented. No database is required.
+- **Scope:** the API supports basic and optional operations. Scientific notation and implicit multiplication are not implemented. Power wraps the current expression as `(expression)^(`; Square root inserts the complete `(expression)^(1/2)`. Undefined values such as `0^0`, `0/0`, and negative square roots return HTTP 422. Percentage is a postfix division by 100. No database is required.
 
 ## Verification and coverage
 
@@ -135,7 +135,8 @@ For a manual browser check, evaluate `2+3`, continue with `*4`, start fresh with
 | Path | Purpose |
 | --- | --- |
 | `backend/main.go` | HTTP server entry point |
-| `backend/src/` | Expression parser, arithmetic service, HTTP router, and Go tests |
+| `backend/calculator/` | Expression parser, arithmetic, and unit tests |
+| `backend/httpapi/` | HTTP handler, result formatting, and API tests |
 | `frontend/app/` | Next.js pages and shared styles |
 | `frontend/components/` | Calculator, keypad, and history UI |
 | `frontend/lib/calculator-api.ts` | API client and error handling |

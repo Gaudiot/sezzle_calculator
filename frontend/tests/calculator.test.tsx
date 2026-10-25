@@ -17,6 +17,68 @@ function expressionInput() {
 }
 
 describe("calculator input", () => {
+  it.each(["Exponentiation"])("wraps the whole expression using %s and submits the entered exponent", async (name) => {
+    const user = userEvent.setup();
+    render(<Calculator />);
+    await user.type(expressionInput(), "2+7");
+    await user.click(screen.getByRole("button", { name }));
+    expect(expressionInput()).toHaveValue("(2+7)^(");
+    await user.click(screen.getByRole("button", { name: "Calculate result" }));
+    expect(evaluateMock).not.toHaveBeenCalled();
+    await user.type(expressionInput(), "1/2){Enter}");
+    await waitFor(() => expect(evaluateMock).toHaveBeenCalledWith("(2+7)^(1/2)"));
+  });
+
+  it("inserts a complete square root and submits without further input", async () => {
+    const user = userEvent.setup();
+    render(<Calculator />);
+    await user.type(expressionInput(), "2+7");
+    await user.click(screen.getByRole("button", { name: "Square root" }));
+    expect(expressionInput()).toHaveValue("(2+7)^(1/2)");
+    await user.click(screen.getByRole("button", { name: "Calculate result" }));
+    await waitFor(() => expect(evaluateMock).toHaveBeenCalledWith("(2+7)^(1/2)"));
+    await waitFor(() => expect(expressionInput()).toHaveAccessibleName("Result"));
+    await user.click(screen.getByRole("button", { name: "Square root" }));
+    expect(expressionInput()).toHaveValue("(5)^(1/2)");
+  });
+
+  it("keeps the expression when a square root would exceed the length limit", async () => {
+    const user = userEvent.setup();
+    render(<Calculator />);
+    fireEvent.change(expressionInput(), { target: { value: "1".repeat(57) } });
+    await user.click(screen.getByRole("button", { name: "Square root" }));
+    expect(expressionInput()).toHaveValue("1".repeat(57));
+  });
+
+  it("wraps keyboard exponentiation and accepts postfix percentage", async () => {
+    const user = userEvent.setup();
+    render(<Calculator />);
+    await user.type(expressionInput(), "2+3^2)%{Enter}");
+    await waitFor(() => expect(evaluateMock).toHaveBeenCalledWith("(2+3)^(2)%"));
+  });
+
+  it("rejects exponentiation for incomplete expressions and when wrapping exceeds the limit", async () => {
+    const user = userEvent.setup();
+    render(<Calculator />);
+    await user.click(screen.getByRole("button", { name: "Square root" }));
+    expect(expressionInput()).toHaveValue("");
+    expect(screen.getByRole("alert")).toHaveTextContent("Complete the expression");
+    fireEvent.change(expressionInput(), { target: { value: "1".repeat(61) } });
+    await user.click(screen.getByRole("button", { name: "Exponentiation" }));
+    expect(expressionInput()).toHaveValue("1".repeat(61));
+  });
+
+  it("applies percentage and power to a displayed result", async () => {
+    const user = userEvent.setup();
+    render(<Calculator />);
+    await user.type(expressionInput(), "2+3{Enter}");
+    await waitFor(() => expect(expressionInput()).toHaveAccessibleName("Result"));
+    await user.click(screen.getByRole("button", { name: "Percentage" }));
+    expect(expressionInput()).toHaveValue("5%");
+    await user.click(screen.getByRole("button", { name: "Exponentiation" }));
+    expect(expressionInput()).toHaveValue("(5%)^(");
+  });
+
   it("blocks leading plus and invalid keypad operator sequences", async () => {
     const user = userEvent.setup();
     render(<Calculator />);

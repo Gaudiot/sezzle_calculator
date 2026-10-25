@@ -4,7 +4,7 @@ export type ExpressionState = "invalid" | "incomplete" | "complete";
 
 // An unfinished but valid prefix must remain editable, such as "1+" or "(2".
 export function getExpressionState(expression: string): ExpressionState {
-  if (expression.length > MAX_EXPRESSION_LENGTH || /[^0-9+\-*/().]/.test(expression)) {
+  if (expression.length > MAX_EXPRESSION_LENGTH || /[^0-9+\-*/^%().]/.test(expression)) {
     return "invalid";
   }
 
@@ -54,7 +54,12 @@ export function getExpressionState(expression: string): ExpressionState {
       continue;
     }
 
-    if (/[+\-*/]/.test(character)) {
+    if (character === "%") {
+      position++;
+      continue;
+    }
+
+    if (/[+\-*/^]/.test(character)) {
       expectsOperand = true;
       // Negative operands after an operator must be grouped: 1*(-2), not 1*-2.
       allowsUnaryMinus = false;

@@ -1,40 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Calculator frontend
 
-## Getting Started
+React and TypeScript with Next.js. Install dependencies with `npm install`, then
+run `npm run dev` and open http://localhost:3000. Run the Go backend at
+http://localhost:8000. The frontend proxies `/api/math` to the backend; set
+`BACKEND_URL` to another backend origin before starting or building when needed.
 
-First, run the development server:
+Use `npm run build` and `npm start` for a production build.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Operations
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Enter numbers, parentheses, `+`, `-`, `*`, `/`, `^`, and postfix `%`.
+The Power button and keyboard `^` wrap the current expression and add `^(`,
+leaving the exponent for you to enter and close with `)`. Square root inserts
+the complete `(expression)^(1/2)`; for example, `2+7` becomes `(2+7)^(1/2)`.
+Percentage divides its preceding operand by 100: `50%` is `0.5`, and `(20+30)%` is also `0.5`.
 
-Run the backend at `http://localhost:8000`. The frontend proxies `/api/math` to
-the backend so browser requests use the frontend origin. To use another backend,
-set `BACKEND_URL` to its origin before starting or building the frontend.
+Inputs are limited to 64 characters. Whitespace, implicit multiplication, and
+invalid operator sequences are blocked. Negative operands after an operator
+must be grouped, such as `2^(-3)`. Calculation errors appear below the input.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Design and verification
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`components/calculator.tsx` owns UI state and coordinates input and requests.
+The keypad and history are presentation components. `lib/expression-editing.ts`
+contains pure editing rules, `lib/expression-validation.ts` checks syntax and
+editable prefixes, and `lib/calculator-api.ts` handles HTTP. The backend owns
+arithmetic, precedence, precision, and domain validation; there is no client-side
+evaluation or duplicate calculation engine.
 
-## Learn More
+Each component keeps its scoped CSS Module alongside its TypeScript file. Page
+layout styles live in `app/page.module.css`; `app/globals.css` contains only the
+shared theme, resets, and reduced-motion preferences. The existing coordinator,
+keypad, and history boundaries remain small enough to maintain without extra
+component layers.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Run `npm test`, `npm run test:coverage`, `npm run lint`, and `npx tsc --noEmit`.
+Coverage reports are written to `coverage/`. Tests cover expression editing and
+validation, API requests and errors, and user interaction through results and
+history.

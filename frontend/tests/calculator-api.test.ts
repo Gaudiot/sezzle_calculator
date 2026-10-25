@@ -9,6 +9,11 @@ beforeEach(() => {
 });
 
 describe("calculator API", () => {
+  it.each(["(9)^(1/2)", "2^3^2", "50%", "(20+30)%"])("sends advanced expression %s unchanged", async (expression) => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ result: "3" })));
+    await expect(evaluateExpression(expression)).resolves.toBe("3");
+    expect(fetchMock).toHaveBeenCalledWith(`/api/math?query=${encodeURIComponent(btoa(expression))}`);
+  });
   it("sends a URL-encoded Base64 query through the same-origin proxy", async () => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ result: "20" })));
     await expect(evaluateExpression("(2+3)*4")).resolves.toBe("20");

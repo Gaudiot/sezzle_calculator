@@ -1,0 +1,72 @@
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.key {
+  min-height: 54px;
+  border: 0;
+  border-radius: 14px;
+  background: #eeece6;
+  cursor: pointer;
+  font: 650 1.1rem/1 var(--font-sans), sans-serif;
+  transition: transform 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.key:hover {
+  background: #e4e0d8;
+}
+
+.key:active {
+  transform: scale(0.96);
+}
+
+.key:focus-visible {
+  outline: 3px solid rgba(232, 93, 63, 0.34);
+  outline-offset: -2px;
+}
+
+.key:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.key--operator {
+  background: #ffe3da;
+  color: var(--accent-dark);
+  font-size: 1.35rem;
+}
+
+.key--utility {
+  color: var(--accent-dark);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.key--equals {
+  background: var(--accent);
+  color: white;
+  font-size: 1.45rem;
+}
+
+.key--wide {
+  grid-column: span 2;
+}
+
+.key--equals:hover {
+  background: var(--accent-dark);
+}
+
+@media (min-width: 720px) {
+  .keypad {
+    gap: 10px;
+    padding-top: 14px;
+  }
+
+  .key {
+    min-height: 62px;
+  }
+}
